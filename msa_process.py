@@ -24,7 +24,7 @@ parser.add_argument('--rm_ambigs', default = False, action = 'store_true',
 dest = 'rm_ambig', help = 'Boolean. Optional. Remove sequences with ambiguous characters.')
 parser.add_argument('--ambig_strategy', action = 'store', dest = 'ambig_strategy',
 nargs = '?', type = str, help = 'Use along with rm_ambigs. Remove columns or sequences. Choose "column" or "sequence".')
-parser.add_argument('--unique', default=False, action = 'store_true',
+parser.add_argument('--unique', default = False, action = 'store_true',
 dest = 'unique', help = 'Boolean. Optional. Only store unique sequences and identifiers.')
 parser.add_argument('--seq_type', type = str, action = 'store', dest = 'seq_type',
 nargs = '?', help='Sequence type, specify "dna", "rna", or "amino". Optional, used for ambiguous character removal.')
@@ -35,7 +35,9 @@ parser.add_argument('--output_format', type = str, dest = 'outfmt', action = 'st
 help="""output MSA format. Required. Valid formats: clustal, emboss, fasta, fasta-m10, ig,
 maf, mauve, nexus, phylip, phylip-sequential, phylip-relaxed, stockholm""")
 parser.add_argument('--logfile', type = str, dest = 'logfile', action = 'store',
-nargs = '?', help = 'path to optional logfile')
+nargs = '?', help = 'path to logfile')
+parser.add_argument('--quiet', default = False, action = 'store_true',
+dest = 'quiet', help = 'suppress status messages' )
 opts = parser.parse_args()
 
 #==============================================================================
@@ -74,25 +76,42 @@ valid_seqtype = ['amino', 'nuc']
 #     fmt_alignment = alignment.format(format)
 #     print("Alignment changed from '%s' to '%s' format" % (opts.infmt, opts.outfmt))
 #     return fmt_alignment
+
+
 #------------------------------------------------------------------------------
-def rm_ambig(alignment, strategy, ambig_list):
+def rm_ambig(alignment, strategy, ambig_list, logfile='', quiet=False):
     """
     Remove either columns or entire sequences in an alignment
     object that contain ambiguous characters specified in a list.
     Returns a MultipleSequenceAlignment object.
     """
     if strategy == 'column':
-        print('Strategy: remove columns with ambiguous characters')
+        strat_msg = 'Strategy: remove columns with ambiguous characters'
+        #if not quiet:
+        logging.info(strat_msg)
+        # if logfile:
+        #     logfile.write(strat_msg + '\n')
+
         keep_cols = []
         rm_cols = []
         for i in range(alignment.get_alignment_length()):
             #Check if any ambiguous characters in the columns.
-            if any([ambig in alignment[:, i] for ambig in ambig_list]):
+            ambig_pos = [(alignment[pos].id, char, i) for pos, char in enumerate(str(alignment[:, i])) if char in ambig_list]
+            #if any([ambig in alignment[:, i] for ambig in ambig_list]):
+            if ambig_pos:
+                ambig_msg = ['Sequence %s: ambiguous character "%s" found at position %d' % (a, b, c) for a, b, c in ambig_pos]
+                logging.info(ambig_msg[0])
+                #the position of the ambigs in the columns. which indices?
+                #ambig_pos = [(alignment[pos].id, char, i) for pos, char in enumerate(str(alignment[:, i])) if char in ambig_list]
                 rm_cols.append(i)
             else:
                 keep_cols.append(i)
         if rm_cols:
-            print('ambiguous symbols found in column(s): %s' % ','.join([str(x) for x in rm_cols]))
+            rmcol_msg = 'ambiguous symbols found in column(s): %s' % ','.join([str(x) for x in rm_cols])
+            if not quiet:
+                logging.info(rmcol_msg)
+            if logfile:
+                logging.info(rmcol_msg)
         else:
             pass
         ali_records = []
@@ -102,19 +121,24 @@ def rm_ambig(alignment, strategy, ambig_list):
             ali_records.append(seqrec)
         alignment_edit = MultipleSeqAlignment(ali_records)
         return alignment_edit
+
     elif strategy == 'sequence':
-        print('Strategy: remove sequences with ambiguous characters')
+        if not quiet:
+            logging.info('Strategy: remove sequences with ambiguous characters')
         #Get the alignment records whose sequences do not contain ambiguous characters
         ali_records = [record for record in alignment if all([not char in record.seq for char in ambig_list])]
         removed = len(alignment) - len(ali_records)
         alignment_edit = MultipleSeqAlignment(ali_records)
-        print('%d sequences containing ambiguous characters removed from alignment' % removed)
+        if not quiet:
+            logging.info('%d sequences containing ambiguous characters removed from alignment' % removed)
         return alignment_edit
     else:
         logging.warning('invalid ambig removal strategy "%s" specified. Choose "column" or "sequence"' % strategy)
         return
+    # if logfile:
+    #     logfile.close()
 #------------------------------------------------------------------------------
-def unique_records(alignment, illegals):
+def unique_records(alignment, illegals, *logfile):
     """
     Create a dictionary from an alignment object containing unique sequences
     and identifiers. Characters in the identifier that often break alignment
@@ -157,11 +181,14 @@ def unique_records(alignment, illegals):
             else:
                 for v in i:
                     if v in sequence_dict.values():
-                        print('####\nsequences:\n%s\nare identical. %s is kept in the alignment\n####' % (','.join(i), v))
+                        #print('####\nsequences:\n%s\nare identical. %s is kept in the alignment\n####' % (','.join(i), v))
+                        logging.info('sequences:\n%s\nare identical. %s is kept in the alignment' % (','.join(i), v))
+
                     else:
                         pass
 
-    print('total non-unique sequences omitted: %d' % omit)
+    #print('total non-unique sequences omitted: %d' % omit)
+    logging.info('total non-unique sequences omitted: %d' % omit)
     #Convert the dictionary into a MultipleSequenceAlignment object
     ali_records = []
     for sequence in sequence_dict.keys():
@@ -173,23 +200,39 @@ def unique_records(alignment, illegals):
 
     return alignment_uniq
 #==============================================================================
+
+#==============================================================================
 ####
 #MAIN
 ####
+
+#Open the logfile and
+if opts.logfile:
+    #open(opts.logfile, 'w')
+    logging.basicConfig(filename=opts.logfile,
+                        filemode='w',
+                        format='%(asctime)s,%(msecs)d %(name)s - %(levelname)s - %(message)s',
+                        datefmt='%H:%M:%S',
+                        level=logging.DEBUG)
+else:
+    pass
 
 #Read in the alignment as a MultipleSeqAlignment
 alignment = AlignIO.read(opts.input_file, opts.infmt)
 
 if opts.infmt != opts.outfmt:
     if opts.outfmt in valid_formats:
-        print("Alignment changed from '%s' to '%s' format." % (opts.infmt, opts.outfmt))
+        logging.info("Alignment changed from '%s' to '%s' format." % (opts.infmt, opts.outfmt))
     else:
-        logging.warning('Specified MSA format is not valid! Choose from: %s' % ','.join(valid_formats))
+        logging.error('Specified MSA format is not valid! Choose from: %s' % ','.join(valid_formats))
 
 if not opts.rm_ambig and not opts.unique:
-    print("No preprocessing steps specified. Writing alignment in '%s' format to '%s' format." % (opts.infmt, opts.outfmt))
+    logging.info("No preprocessing steps specified. Writing alignment in '%s' format to '%s' format." % (opts.infmt, opts.outfmt))
     AlignIO.write(alignment, opts.output_file, opts.outfmt)
 else:
+    #Get unique sequences and identifiers
+    if opts.unique:
+        alignment = unique_records(alignment = alignment, illegals = illegal_chars)
     #Remove ambiguous characters if specified
     if opts.rm_ambig:
         ambig_list = list()
@@ -203,8 +246,6 @@ else:
         if ambig_list:
             rm_ambig(alignment = alignment, strategy = opts.ambig_strategy, ambig_list = ambig_list)
 
-    #Get unique sequences and identifiers
-    if opts.unique:
-        alignment = unique_records(alignment = alignment, illegals = illegal_chars)
+#==============================================================================
 
     AlignIO.write(alignment, opts.output_file, opts.outfmt)
