@@ -89,9 +89,6 @@ def rm_ambig(alignment, strategy, ambig_list, logfile='', quiet=False):
         strat_msg = 'Strategy: remove columns with ambiguous characters'
         #if not quiet:
         logging.info(strat_msg)
-        # if logfile:
-        #     logfile.write(strat_msg + '\n')
-
         keep_cols = []
         rm_cols = []
         for i in range(alignment.get_alignment_length()):
@@ -108,10 +105,11 @@ def rm_ambig(alignment, strategy, ambig_list, logfile='', quiet=False):
                 keep_cols.append(i)
         if rm_cols:
             rmcol_msg = 'ambiguous symbols found in column(s): %s' % ','.join([str(x) for x in rm_cols])
-            if not quiet:
-                logging.info(rmcol_msg)
-            if logfile:
-                logging.info(rmcol_msg)
+            logging.info(rmcol_msg)
+            # if not quiet:
+            #     logging.info(rmcol_msg)
+            # if logfile:
+            #     logging.info(rmcol_msg)
         else:
             pass
         ali_records = []
@@ -219,6 +217,7 @@ else:
 
 #Read in the alignment as a MultipleSeqAlignment
 alignment = AlignIO.read(opts.input_file, opts.infmt)
+logging.info('input alignment %s, nrow = %d, ncol = %d' % (opts.input_file, len(alignment[:]), alignment.get_alignment_length()))
 
 if opts.infmt != opts.outfmt:
     if opts.outfmt in valid_formats:
@@ -226,8 +225,9 @@ if opts.infmt != opts.outfmt:
     else:
         logging.error('Specified MSA format is not valid! Choose from: %s' % ','.join(valid_formats))
 
-if not opts.rm_ambig and not opts.unique:
-    logging.info("No preprocessing steps specified. Writing alignment in '%s' format to '%s' format." % (opts.infmt, opts.outfmt))
+#If not removing columns/rows with ambiguous characters or non-unique sequences
+if opts.infmt and opts.outfmt and not opts.rm_ambig and not opts.unique:
+    logging.info("No preprocessing steps specified. Converting alignment in '%s' format to '%s' format." % (opts.infmt, opts.outfmt))
     AlignIO.write(alignment, opts.output_file, opts.outfmt)
 else:
     #Get unique sequences and identifiers
@@ -244,7 +244,10 @@ else:
             logging.warning('choose a valid --seq_type: "amino", "dna", or "rna"')
             pass
         if ambig_list:
-            rm_ambig(alignment = alignment, strategy = opts.ambig_strategy, ambig_list = ambig_list)
+            alignment = rm_ambig(alignment = alignment, strategy = opts.ambig_strategy, ambig_list = ambig_list)
+            #AlignIO.write(alignment_noambig, opts.output_file, opts.outfmt)
+
+            
 
 #==============================================================================
 
