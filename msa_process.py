@@ -79,7 +79,7 @@ valid_seqtype = ['amino', 'nuc']
 
 
 #------------------------------------------------------------------------------
-def rm_ambig(alignment, strategy, ambig_list, logfile='', quiet=False):
+def rm_ambig(alignment, strategy, ambig_list):
     """
     Remove either columns or entire sequences in an alignment
     object that contain ambiguous characters specified in a list.
@@ -121,22 +121,33 @@ def rm_ambig(alignment, strategy, ambig_list, logfile='', quiet=False):
         return alignment_edit
 
     elif strategy == 'sequence':
-        if not quiet:
-            logging.info('Strategy: remove sequences with ambiguous characters')
+        logging.info('Strategy: remove sequences with ambiguous characters')
         #Get the alignment records whose sequences do not contain ambiguous characters
-        ali_records = [record for record in alignment if all([not char in record.seq for char in ambig_list])]
+        removed_records = []
+        #ali_records = [alignment[i,:] else removed_records.append(alignment[i,:]) for i in range(len(alignment)) if all([not char in alignment[i,:].seq for char in ambig_list])]
+        #ali_records = [record for record in alignment if all([not char in record.seq for char in ambig_list])]
+        #ali_records = [record if all([not char in record.seq for char in ambig_list]) else removed_records.append(record) for record in alignment]
+        ali_records = []
+        for record in alignment:
+            if all([not char in record.seq for char in ambig_list]):
+                ali_records.append(record)
+            else:
+                removed_records.append(record)
+
+
         removed = len(alignment) - len(ali_records)
+        #print(removed_records)
+        #print(ali_records)
         alignment_edit = MultipleSeqAlignment(ali_records)
-        if not quiet:
-            logging.info('%d sequences containing ambiguous characters removed from alignment' % removed)
+        logging.info('%d sequences containing ambiguous characters removed from alignment' % removed)
+        logging.info('removed sequences %s' % ','.join([record.id for record in removed_records]))
+
         return alignment_edit
     else:
         logging.warning('invalid ambig removal strategy "%s" specified. Choose "column" or "sequence"' % strategy)
         return
-    # if logfile:
-    #     logfile.close()
 #------------------------------------------------------------------------------
-def unique_records(alignment, illegals, *logfile):
+def unique_records(alignment, illegals):
     """
     Create a dictionary from an alignment object containing unique sequences
     and identifiers. Characters in the identifier that often break alignment
@@ -198,8 +209,6 @@ def unique_records(alignment, illegals, *logfile):
 
     return alignment_uniq
 #==============================================================================
-
-#==============================================================================
 ####
 #MAIN
 ####
@@ -228,6 +237,7 @@ if opts.infmt != opts.outfmt:
 #If not removing columns/rows with ambiguous characters or non-unique sequences
 if opts.infmt and opts.outfmt and not opts.rm_ambig and not opts.unique:
     logging.info("No preprocessing steps specified. Converting alignment in '%s' format to '%s' format." % (opts.infmt, opts.outfmt))
+    logging.info('output alignment %s, nrow = %d, ncol = %d' % (opts.input_file, len(alignment[:]), alignment.get_alignment_length()))
     AlignIO.write(alignment, opts.output_file, opts.outfmt)
 else:
     #Get unique sequences and identifiers
@@ -246,9 +256,7 @@ else:
         if ambig_list:
             alignment = rm_ambig(alignment = alignment, strategy = opts.ambig_strategy, ambig_list = ambig_list)
             #AlignIO.write(alignment_noambig, opts.output_file, opts.outfmt)
-
-            
-
-#==============================================================================
-
+#------------------------------------------------------------------------------
+    #Write the final alignment object
+    logging.info('output alignment %s, nrow = %d, ncol = %d' % (opts.input_file, len(alignment[:]), alignment.get_alignment_length()))
     AlignIO.write(alignment, opts.output_file, opts.outfmt)
