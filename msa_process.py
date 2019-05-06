@@ -2,6 +2,7 @@
 import argparse
 import re
 import logging
+import os
 from Bio import AlignIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
@@ -20,10 +21,12 @@ parser.add_argument('--input', type = str, dest = 'input_file',
 action = 'store', help = 'path to input MSA file.')
 parser.add_argument('--output', type = str, dest = 'output_file',
 action = 'store', help = 'path to output MSA file.')
-parser.add_argument('--rm_ambigs', default = False, action = 'store_true',
-dest = 'rm_ambig', help = 'Boolean. Optional. Remove sequences with ambiguous characters.')
-parser.add_argument('--ambig_strategy', action = 'store', dest = 'ambig_strategy',
-nargs = '?', type = str, help = 'Use along with rm_ambigs. Remove columns or sequences. Choose "column" or "sequence".')
+parser.add_argument('--rm_ambigs', default = 'column', action = 'store',
+                    dest = 'rm_ambig', nargs = '?', type = str,
+                    help = '''Remove columns or sequences with ambiguous characters.
+                    Choose "column" or "sequence". Default is "column".''')
+# parser.add_argument('--ambig_strategy', action = 'store', dest = 'ambig_strategy',
+# nargs = '?', type = str, help = 'Use along with rm_ambigs. Remove columns or sequences. Choose "column" or "sequence".')
 parser.add_argument('--unique', default = False, action = 'store_true',
 dest = 'unique', help = 'Boolean. Optional. Only store unique sequences and identifiers.')
 parser.add_argument('--seq_type', type = str, action = 'store', dest = 'seq_type',
@@ -36,8 +39,8 @@ help="""output MSA format. Required. Valid formats: clustal, emboss, fasta, fast
 maf, mauve, nexus, phylip, phylip-sequential, phylip-relaxed, stockholm""")
 parser.add_argument('--logfile', type = str, dest = 'logfile', action = 'store',
 nargs = '?', help = 'path to logfile')
-parser.add_argument('--quiet', default = False, action = 'store_true',
-dest = 'quiet', help = 'suppress status messages' )
+# parser.add_argument('--quiet', default = False, action = 'store_true',
+# dest = 'quiet', help = 'suppress status messages' )
 opts = parser.parse_args()
 
 #==============================================================================
@@ -54,31 +57,6 @@ valid_formats = ['clustal', 'emboss', 'fasta', 'fasta-m10', 'ig', 'maf',
 'mauve', 'nexus', 'phylip', 'phylip-sequential', 'phylip-relaxed', 'stockholm']
 valid_seqtype = ['amino', 'nuc']
 #==============================================================================
-# def msa_convert(msain, infmt, msaout, outfmt):
-#     '''
-#     Change the format of an msa file.
-#     '''
-#     outfmt = outfmt.lower()
-#     if not outfmt in valid_formats:
-#         logging.warning('Specified MSA format is not valid! Choose from: %s' % ','.join(valid_formats))
-#         return
-#     AlignIO.convert(msain, infmt, msaout, outfmt)
-#     print('converted %s from %s to %s' % (msain, infmt, outfmt))
-#     return None
-# #------------------------------------------------------------------------------
-# def msa_format(alignment, format):
-#     '''
-#     Change the format of an alignment object.
-#     '''
-#     if not format in valid_formats:
-#         logging.warning('Specified MSA format is not valid! Choose from: %s' % ','.join(valid_formats))
-#         return
-#     fmt_alignment = alignment.format(format)
-#     print("Alignment changed from '%s' to '%s' format" % (opts.infmt, opts.outfmt))
-#     return fmt_alignment
-
-
-#------------------------------------------------------------------------------
 def rm_ambig(alignment, strategy, ambig_list):
     """
     Remove either columns or entire sequences in an alignment
@@ -104,7 +82,7 @@ def rm_ambig(alignment, strategy, ambig_list):
             else:
                 keep_cols.append(i)
         if rm_cols:
-            rmcol_msg = 'ambiguous symbols found in column(s): %s' % ','.join([str(x) for x in rm_cols])
+            rmcol_msg = 'ambiguous symbols found in %d column(s): %s' % (len(rm_cols), ','.join([str(x) for x in rm_cols]))
             logging.info(rmcol_msg)
             # if not quiet:
             #     logging.info(rmcol_msg)
@@ -136,15 +114,14 @@ def rm_ambig(alignment, strategy, ambig_list):
 
 
         removed = len(alignment) - len(ali_records)
-        #print(removed_records)
-        #print(ali_records)
         alignment_edit = MultipleSeqAlignment(ali_records)
         logging.info('%d sequences containing ambiguous characters removed from alignment' % removed)
         logging.info('removed sequences %s' % ','.join([record.id for record in removed_records]))
 
         return alignment_edit
     else:
-        logging.warning('invalid ambig removal strategy "%s" specified. Choose "column" or "sequence"' % strategy)
+        inval_strat_msg = 'invalid ambig removal strategy "%s" specified. Choose "column" or "sequence"' % strategy
+        logging.warning(inval_strat_msg)
         return
 #------------------------------------------------------------------------------
 def unique_records(alignment, illegals):
@@ -213,7 +190,7 @@ def unique_records(alignment, illegals):
 #MAIN
 ####
 
-#Open the logfile and
+#Open the logfile
 if opts.logfile:
     #open(opts.logfile, 'w')
     logging.basicConfig(filename=opts.logfile,
@@ -225,9 +202,10 @@ else:
     pass
 
 #Read in the alignment as a MultipleSeqAlignment
-alignment = AlignIO.read(opts.input_file, opts.infmt)
-logging.info('input alignment %s, nrow = %d, ncol = %d' % (opts.input_file, len(alignment[:]), alignment.get_alignment_length()))
+alignment = AlignIO.read(os.path.abspath(opts.input_file), opts.infmt)
+logging.info('input alignment %s, nrow = %d, ncol = %d' % (os.path.abspath(opts.input_file), len(alignment[:]), alignment.get_alignment_length()))
 
+#Specify that the alignment format is to be changed
 if opts.infmt != opts.outfmt:
     if opts.outfmt in valid_formats:
         logging.info("Alignment changed from '%s' to '%s' format." % (opts.infmt, opts.outfmt))
@@ -237,8 +215,8 @@ if opts.infmt != opts.outfmt:
 #If not removing columns/rows with ambiguous characters or non-unique sequences
 if opts.infmt and opts.outfmt and not opts.rm_ambig and not opts.unique:
     logging.info("No preprocessing steps specified. Converting alignment in '%s' format to '%s' format." % (opts.infmt, opts.outfmt))
-    logging.info('output alignment %s, nrow = %d, ncol = %d' % (opts.input_file, len(alignment[:]), alignment.get_alignment_length()))
-    AlignIO.write(alignment, opts.output_file, opts.outfmt)
+    logging.info('output alignment %s, nrow = %d, ncol = %d' % (os.path.abspath(opts.input_file), len(alignment[:]), alignment.get_alignment_length()))
+    AlignIO.write(alignment, os.path.abspath(opts.output_file), opts.outfmt)
 else:
     #Get unique sequences and identifiers
     if opts.unique:
@@ -254,9 +232,9 @@ else:
             logging.warning('choose a valid --seq_type: "amino", "dna", or "rna"')
             pass
         if ambig_list:
-            alignment = rm_ambig(alignment = alignment, strategy = opts.ambig_strategy, ambig_list = ambig_list)
-            #AlignIO.write(alignment_noambig, opts.output_file, opts.outfmt)
+            alignment = rm_ambig(alignment = alignment, strategy = opts.rm_ambig, ambig_list = ambig_list)
 #------------------------------------------------------------------------------
     #Write the final alignment object
-    logging.info('output alignment %s, nrow = %d, ncol = %d' % (opts.input_file, len(alignment[:]), alignment.get_alignment_length()))
-    AlignIO.write(alignment, opts.output_file, opts.outfmt)
+    final_msg = 'output alignment %s, nrow = %d, ncol = %d' % (os.path.abspath(opts.input_file), len(alignment[:]), alignment.get_alignment_length())
+    logging.info(final_msg)
+    AlignIO.write(alignment, os.path.abspath(opts.output_file), opts.outfmt)
