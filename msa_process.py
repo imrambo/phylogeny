@@ -25,8 +25,6 @@ parser.add_argument('--rm_ambigs', default = 'column', action = 'store',
                     dest = 'rm_ambig', nargs = '?', type = str,
                     help = '''Remove columns or sequences with ambiguous characters.
                     Choose "column" or "sequence". Default is "column".''')
-# parser.add_argument('--ambig_strategy', action = 'store', dest = 'ambig_strategy',
-# nargs = '?', type = str, help = 'Use along with rm_ambigs. Remove columns or sequences. Choose "column" or "sequence".')
 parser.add_argument('--unique', default = False, action = 'store_true',
 dest = 'unique', help = 'Boolean. Optional. Only store unique sequences and identifiers.')
 parser.add_argument('--seq_type', type = str, action = 'store', dest = 'seq_type',
@@ -65,29 +63,21 @@ def rm_ambig(alignment, strategy, ambig_list):
     """
     if strategy == 'column':
         strat_msg = 'Strategy: remove columns with ambiguous characters'
-        #if not quiet:
         logging.info(strat_msg)
         keep_cols = []
         rm_cols = []
         for i in range(alignment.get_alignment_length()):
             #Check if any ambiguous characters in the columns.
             ambig_pos = [(alignment[pos].id, char, i) for pos, char in enumerate(str(alignment[:, i])) if char in ambig_list]
-            #if any([ambig in alignment[:, i] for ambig in ambig_list]):
             if ambig_pos:
                 ambig_msg = ['Sequence %s: ambiguous character "%s" found at position %d' % (a, b, c) for a, b, c in ambig_pos]
                 logging.info(ambig_msg[0])
-                #the position of the ambigs in the columns. which indices?
-                #ambig_pos = [(alignment[pos].id, char, i) for pos, char in enumerate(str(alignment[:, i])) if char in ambig_list]
                 rm_cols.append(i)
             else:
                 keep_cols.append(i)
         if rm_cols:
             rmcol_msg = 'ambiguous symbols found in %d column(s): %s' % (len(rm_cols), ','.join([str(x) for x in rm_cols]))
             logging.info(rmcol_msg)
-            # if not quiet:
-            #     logging.info(rmcol_msg)
-            # if logfile:
-            #     logging.info(rmcol_msg)
         else:
             pass
         ali_records = []
@@ -102,9 +92,6 @@ def rm_ambig(alignment, strategy, ambig_list):
         logging.info('Strategy: remove sequences with ambiguous characters')
         #Get the alignment records whose sequences do not contain ambiguous characters
         removed_records = []
-        #ali_records = [alignment[i,:] else removed_records.append(alignment[i,:]) for i in range(len(alignment)) if all([not char in alignment[i,:].seq for char in ambig_list])]
-        #ali_records = [record for record in alignment if all([not char in record.seq for char in ambig_list])]
-        #ali_records = [record if all([not char in record.seq for char in ambig_list]) else removed_records.append(record) for record in alignment]
         ali_records = []
         for record in alignment:
             if all([not char in record.seq for char in ambig_list]):
@@ -167,13 +154,11 @@ def unique_records(alignment, illegals):
             else:
                 for v in i:
                     if v in sequence_dict.values():
-                        #print('####\nsequences:\n%s\nare identical. %s is kept in the alignment\n####' % (','.join(i), v))
                         logging.info('sequences:\n%s\nare identical. %s is kept in the alignment' % (','.join(i), v))
 
                     else:
                         pass
 
-    #print('total non-unique sequences omitted: %d' % omit)
     logging.info('total non-unique sequences omitted: %d' % omit)
     #Convert the dictionary into a MultipleSequenceAlignment object
     ali_records = []
@@ -192,7 +177,6 @@ def unique_records(alignment, illegals):
 
 #Open the logfile
 if opts.logfile:
-    #open(opts.logfile, 'w')
     logging.basicConfig(filename=opts.logfile,
                         filemode='w',
                         format='%(asctime)s,%(msecs)d %(name)s - %(levelname)s - %(message)s',
