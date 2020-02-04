@@ -8,7 +8,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 """
-Ian Rambo 2019
+Ian Rambo 2020
 Purpose: preprocessing of multiple sequence alignment(s).
 The user can remove columns or sequences with ambigous characters,
 keep only unique sequences and headers, and change the MSA format.
@@ -49,7 +49,7 @@ ambig_aa = ['B','J','O','U','X','Z']
 #Ambiguous nucleotides
 ambig_nuc = ['R','Y','W','S','K','M','D','V','H','B']
 #Characters illegal in header
-illegal_chars = re.compile(r'\:|\,|\)|\(|\;|\,|\]|\[|\,|\'')
+illegal_chars = re.compile(r'\:|\,|\)|\(|\;|\,|\]|\[|\,|\'| {1}')
 #MSA formats compatible with Bio.AlignIO
 valid_formats = ['clustal', 'emboss', 'fasta', 'fasta-m10', 'ig', 'maf',
 'mauve', 'nexus', 'phylip', 'phylip-sequential', 'phylip-relaxed', 'stockholm']
